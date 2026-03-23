@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sieve Script Manager - Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Sieve Script Manager</h1>
+    <p class="subtitle">Configure your ManageSieve server connections</p>
+
+    <div id="account-list">
+      <!-- Populated dynamically -->
+    </div>
+
+    <button id="btn-add" class="btn btn-primary">Add Account</button>
+
+    <!-- Account edit form (hidden by default) -->
+    <div id="account-form" class="form-panel hidden">
+      <h2 id="form-title">Add Account</h2>
+      <input type="hidden" id="account-id">
+
+      <div class="form-group">
+        <label for="account-name">Display Name</label>
+        <input type="text" id="account-name" placeholder="e.g., Work Email">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group flex-grow">
+          <label for="account-host">Server Host</label>
+          <input type="text" id="account-host" placeholder="mail.example.com">
+        </div>
+        <div class="form-group">
+          <label for="account-port">Port</label>
+          <input type="number" id="account-port" value="4190" min="1" max="65535">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="account-security">Connection Security</label>
+        <select id="account-security">
+          <option value="starttls">STARTTLS (Recommended)</option>
+          <option value="none">None</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="account-username">Username</label>
+        <input type="text" id="account-username" placeholder="user@example.com">
+      </div>
+
+      <div class="form-group">
+        <label for="account-password">Password</label>
+        <input type="password" id="account-password" placeholder="Password">
+      </div>
+
+      <div class="form-actions">
+        <button id="btn-test" class="btn">Test Connection</button>
+        <div class="spacer"></div>
+        <button id="btn-cancel" class="btn">Cancel</button>
+        <button id="btn-save" class="btn btn-primary">Save</button>
+      </div>
+
+      <div id="test-result" class="hidden"></div>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

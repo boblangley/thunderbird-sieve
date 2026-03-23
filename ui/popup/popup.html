@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sieve Scripts</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup">
+    <div class="header">
+      <h1>Sieve Scripts</h1>
+      <button id="btn-settings" class="btn-icon" title="Settings" aria-label="Settings">&#9881;</button>
+    </div>
+
+    <div id="account-selector" class="hidden">
+      <select id="account-select"></select>
+    </div>
+
+    <div id="status" class="status">Loading...</div>
+
+    <div id="script-list" class="hidden">
+      <!-- Populated dynamically -->
+    </div>
+
+    <div id="actions" class="actions hidden">
+      <button id="btn-new" class="btn btn-primary btn-sm">New Script</button>
+      <button id="btn-refresh" class="btn btn-sm">Refresh</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

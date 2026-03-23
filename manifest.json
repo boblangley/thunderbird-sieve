@@ -1,0 +1,49 @@
+{
+  "manifest_version": 2,
+  "name": "Sieve Script Manager",
+  "version": "1.0.0",
+  "description": "Manage Sieve email filter scripts on your mail server using the ManageSieve protocol (RFC 5804).",
+  "author": "Thunderbird Sieve Contributors",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "sieve-script-manager@thunderbird-sieve",
+      "strict_min_version": "115.0"
+    }
+  },
+  "icons": {
+    "16": "icons/sieve.svg",
+    "32": "icons/sieve.svg",
+    "48": "icons/sieve.svg",
+    "96": "icons/sieve.svg"
+  },
+  "permissions": [
+    "storage",
+    "accountsRead"
+  ],
+  "background": {
+    "scripts": ["libs/managesieve.js", "background.js"]
+  },
+  "browser_action": {
+    "default_title": "Sieve Script Manager",
+    "default_icon": "icons/sieve.svg",
+    "default_popup": "ui/popup/popup.html"
+  },
+  "options_ui": {
+    "page": "ui/options/options.html"
+  },
+  "experiment_apis": {
+    "tcp": {
+      "schema": "experiments/tcp/api.json",
+      "parent": {
+        "scopes": ["addon_parent"],
+        "paths": [["tcp"]],
+        "script": "experiments/tcp/parent.js"
+      },
+      "child": {
+        "scopes": ["addon_child"],
+        "paths": [["tcp"]],
+        "script": "experiments/tcp/child.js"
+      }
+    }
+  }
+}
