@@ -1,0 +1,119 @@
+[
+  {
+    "namespace": "tcp",
+    "description": "Provides TCP socket access for protocol implementations",
+    "functions": [
+      {
+        "name": "connect",
+        "description": "Creates a TCP client socket connected to the given host and port. Returns a socket ID.",
+        "type": "function",
+        "async": true,
+        "parameters": [
+          {
+            "name": "host",
+            "type": "string",
+            "description": "Hostname or IP address"
+          },
+          {
+            "name": "port",
+            "type": "integer",
+            "description": "TCP port number"
+          },
+          {
+            "name": "options",
+            "type": "object",
+            "description": "Connection options",
+            "optional": true,
+            "properties": {
+              "timeout": {
+                "type": "integer",
+                "description": "Read/write timeout in seconds",
+                "optional": true
+              },
+              "useSecureTransport": {
+                "type": "boolean",
+                "description": "Connect using TLS from the start",
+                "optional": true
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "readLine",
+        "description": "Reads a line terminated by CRLF from the socket. Returns the line without the CRLF.",
+        "type": "function",
+        "async": true,
+        "parameters": [
+          {
+            "name": "socketId",
+            "type": "integer",
+            "description": "Socket ID returned by connect()"
+          }
+        ]
+      },
+      {
+        "name": "readBytes",
+        "description": "Reads an exact number of bytes from the socket. Returns the data as a string.",
+        "type": "function",
+        "async": true,
+        "parameters": [
+          {
+            "name": "socketId",
+            "type": "integer",
+            "description": "Socket ID returned by connect()"
+          },
+          {
+            "name": "count",
+            "type": "integer",
+            "description": "Number of bytes to read"
+          }
+        ]
+      },
+      {
+        "name": "write",
+        "description": "Writes a string to the socket.",
+        "type": "function",
+        "async": true,
+        "parameters": [
+          {
+            "name": "socketId",
+            "type": "integer",
+            "description": "Socket ID returned by connect()"
+          },
+          {
+            "name": "data",
+            "type": "string",
+            "description": "Data to write"
+          }
+        ]
+      },
+      {
+        "name": "startTLS",
+        "description": "Upgrades the socket connection to TLS (STARTTLS).",
+        "type": "function",
+        "async": true,
+        "parameters": [
+          {
+            "name": "socketId",
+            "type": "integer",
+            "description": "Socket ID returned by connect()"
+          }
+        ]
+      },
+      {
+        "name": "close",
+        "description": "Closes the socket.",
+        "type": "function",
+        "async": true,
+        "parameters": [
+          {
+            "name": "socketId",
+            "type": "integer",
+            "description": "Socket ID returned by connect()"
+          }
+        ]
+      }
+    ]
+  }
+]
