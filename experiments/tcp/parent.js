@@ -172,14 +172,11 @@ var tcp = class extends ExtensionCommon.ExtensionAPI {
           const encoder = new TextEncoder();
           const bytes = encoder.encode(data);
 
-          let offset = 0;
-          while (offset < bytes.length) {
-            const written = sock.rawOutput.write(
-              data.substring(offset),
-              bytes.length - offset
-            );
-            offset += written;
-          }
+          const binaryOutput = Cc[
+            "@mozilla.org/binaryoutputstream;1"
+          ].createInstance(Ci.nsIBinaryOutputStream);
+          binaryOutput.setOutputStream(sock.rawOutput);
+          binaryOutput.writeByteArray(bytes, bytes.length);
         },
 
         async _startTLS(socketId) {

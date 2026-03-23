@@ -156,8 +156,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   $("#btn-save").addEventListener("click", async () => {
     const account = getFormData();
-    if (!account.name || !account.host || !account.username) {
-      alert("Please fill in the required fields: name, host, and username.");
+    if (!account.name || !account.host || !account.username || !account.password) {
+      alert("Please fill in all required fields: name, host, username, and password.");
       return;
     }
     await sendMessage({ action: "saveAccount", account });

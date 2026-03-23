@@ -6,11 +6,22 @@
 
 "use strict";
 
-// Active connections keyed by account config ID
+// Active connections keyed by a fingerprint of account settings
 const connections = new Map();
 
 /**
+ * Build a fingerprint for connection caching that includes server details,
+ * so edits to an account invalidate stale connections.
+ */
+function connectionKey(account) {
+  return `${account.id}|${account.host}|${account.port || 4190}|${account.username}|${account.security || "starttls"}`;
+}
+
+/**
  * Get stored account configurations.
+ * Note: Passwords are stored in browser.storage.local. For production use,
+ * consider integrating with Thunderbird's Login Manager for secure credential
+ * storage.
  */
 async function getAccounts() {
   const result = await browser.storage.local.get("accounts");
@@ -28,16 +39,21 @@ async function saveAccounts(accounts) {
  * Connect to a ManageSieve server for a given account config.
  */
 async function connectAccount(account) {
-  // Reuse existing connection if available
-  if (connections.has(account.id)) {
-    try {
-      // Test the connection with a quick listScripts
-      const client = connections.get(account.id);
-      if (client.authenticated) {
+  const key = connectionKey(account);
+
+  // Reuse existing connection if available and healthy
+  if (connections.has(key)) {
+    const client = connections.get(key);
+    if (client.authenticated) {
+      try {
+        // Validate the connection is still alive with a lightweight command
+        await client.listScripts();
         return client;
+      } catch (e) {
+        // Connection is dead, clean up and reconnect
+        connections.delete(key);
+        await client.close().catch(() => {});
       }
-    } catch (e) {
-      connections.delete(account.id);
     }
   }
 
@@ -46,16 +62,23 @@ async function connectAccount(account) {
   try {
     await client.connect(account.host, account.port || 4190);
 
-    // Upgrade to TLS if available and not disabled
-    if (
-      account.security !== "none" &&
-      client.capabilities.STARTTLS !== undefined
-    ) {
-      await client.startTLS();
+    // Upgrade to TLS if not explicitly disabled
+    if (account.security !== "none") {
+      if (client.capabilities.STARTTLS !== undefined) {
+        await client.startTLS();
+      } else {
+        // STARTTLS expected but not offered — refuse to send credentials
+        // in cleartext to prevent downgrade attacks
+        throw new Error(
+          "Server does not offer STARTTLS. Refusing to authenticate over " +
+            "an unencrypted connection. Set security to 'None' if you " +
+            "intentionally want plaintext."
+        );
+      }
     }
 
     await client.authenticate(account.username, account.password);
-    connections.set(account.id, client);
+    connections.set(key, client);
     return client;
   } catch (e) {
     await client.close();
@@ -66,11 +89,14 @@ async function connectAccount(account) {
 /**
  * Disconnect from a server.
  */
-async function disconnectAccount(accountId) {
-  const client = connections.get(accountId);
-  if (client) {
-    await client.logout();
-    connections.delete(accountId);
+async function disconnectAccount(account) {
+  const key = typeof account === "string" ? account : connectionKey(account);
+  // Try to find by key or by account ID prefix
+  for (const [k, client] of connections) {
+    if (k === key || k.startsWith(account + "|")) {
+      await client.logout().catch(() => {});
+      connections.delete(k);
+    }
   }
 }
 
@@ -87,7 +113,14 @@ browser.runtime.onMessage.addListener(async (message) => {
       case "saveAccount": {
         const accounts = await getAccounts();
         const existing = accounts.findIndex((a) => a.id === message.account.id);
+        // Invalidate any cached connection for this account on edit
         if (existing >= 0) {
+          const oldKey = connectionKey(accounts[existing]);
+          const oldClient = connections.get(oldKey);
+          if (oldClient) {
+            connections.delete(oldKey);
+            oldClient.close().catch(() => {});
+          }
           accounts[existing] = message.account;
         } else {
           accounts.push(message.account);
@@ -98,7 +131,7 @@ browser.runtime.onMessage.addListener(async (message) => {
 
       case "deleteAccount": {
         const accounts = await getAccounts();
-        await disconnectAccount(message.accountId);
+        await disconnectAccount(message.accountId || message.account?.id);
         await saveAccounts(accounts.filter((a) => a.id !== message.accountId));
         return { success: true };
       }
@@ -110,11 +143,15 @@ browser.runtime.onMessage.addListener(async (message) => {
             message.account.host,
             message.account.port || 4190
           );
-          if (
-            message.account.security !== "none" &&
-            caps.STARTTLS !== undefined
-          ) {
-            await client.startTLS();
+          if (message.account.security !== "none") {
+            if (caps.STARTTLS !== undefined) {
+              await client.startTLS();
+            } else {
+              throw new Error(
+                "Server does not offer STARTTLS. Refusing to authenticate " +
+                  "over an unencrypted connection."
+              );
+            }
           }
           await client.authenticate(
             message.account.username,
@@ -178,7 +215,12 @@ browser.runtime.onMessage.addListener(async (message) => {
     console.error(`[SieveManager] Error handling ${message.action}:`, e);
     // If the connection died, remove it so next attempt reconnects
     if (message.account?.id) {
-      connections.delete(message.account.id);
+      const key = connectionKey(message.account);
+      const deadClient = connections.get(key);
+      if (deadClient) {
+        connections.delete(key);
+        deadClient.close().catch(() => {});
+      }
     }
     return { success: false, error: e.message };
   }

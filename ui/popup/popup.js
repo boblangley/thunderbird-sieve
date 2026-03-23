@@ -21,12 +21,6 @@ function showStatus(text, isError = false) {
   $("#actions").classList.add("hidden");
 }
 
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
-}
-
 // ---- Account selector ----
 
 async function loadAccounts() {
@@ -38,21 +32,28 @@ async function loadAccounts() {
   }
 
   const select = $("#account-select");
-  select.innerHTML = accounts
-    .map(
-      (a) =>
-        `<option value="${a.id}">${escapeHtml(a.name)} (${escapeHtml(a.host)})</option>`
-    )
-    .join("");
+  select.textContent = "";
+  for (const a of accounts) {
+    const opt = document.createElement("option");
+    opt.value = a.id;
+    opt.textContent = `${a.name} (${a.host})`;
+    select.appendChild(opt);
+  }
 
   $("#account-selector").classList.remove("hidden");
 
-  // Select first account or previously selected
-  currentAccount = accounts[0];
+  // Restore previously selected account
+  const stored = await browser.storage.local.get("lastAccountId");
+  const lastId = stored.lastAccountId;
+  const restored = accounts.find((a) => a.id === lastId);
+  currentAccount = restored || accounts[0];
+  select.value = currentAccount.id;
+
   await loadScripts();
 
   select.addEventListener("change", async () => {
     currentAccount = accounts.find((a) => a.id === select.value);
+    await browser.storage.local.set({ lastAccountId: currentAccount.id });
     await loadScripts();
   });
 }
@@ -72,72 +73,100 @@ async function loadScripts() {
 
     $("#status").classList.add("hidden");
     const listEl = $("#script-list");
+    listEl.textContent = "";
     listEl.classList.remove("hidden");
     $("#actions").classList.remove("hidden");
 
     if (scripts.length === 0) {
-      listEl.innerHTML =
-        '<div class="empty-scripts">No scripts on server</div>';
+      const empty = document.createElement("div");
+      empty.className = "empty-scripts";
+      empty.textContent = "No scripts on server";
+      listEl.appendChild(empty);
       return;
     }
 
-    listEl.innerHTML = scripts
-      .map(
-        (s) => `
-      <div class="script-item" data-name="${escapeHtml(s.name)}">
-        <span class="script-name">${escapeHtml(s.name)}</span>
-        ${s.active ? '<span class="script-badge">Active</span>' : ""}
-        <div class="script-actions">
-          ${!s.active ? `<button class="btn-activate" title="Activate" data-name="${escapeHtml(s.name)}">&#9654;</button>` : ""}
-          <button class="btn-delete-script" title="Delete" data-name="${escapeHtml(s.name)}">&#10005;</button>
-        </div>
-      </div>
-    `
-      )
-      .join("");
+    for (const script of scripts) {
+      const item = document.createElement("div");
+      item.className = "script-item";
+      item.setAttribute("role", "button");
+      item.setAttribute("tabindex", "0");
+      item.setAttribute("aria-label", `Edit script: ${script.name}`);
 
-    // Click to edit
-    listEl.querySelectorAll(".script-item").forEach((item) => {
-      item.addEventListener("click", (e) => {
-        if (e.target.closest(".script-actions")) return;
-        openEditor(item.dataset.name);
-      });
-    });
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "script-name";
+      nameSpan.textContent = script.name;
+      item.appendChild(nameSpan);
 
-    // Activate button
-    listEl.querySelectorAll(".btn-activate").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
+      if (script.active) {
+        const badge = document.createElement("span");
+        badge.className = "script-badge";
+        badge.textContent = "Active";
+        item.appendChild(badge);
+      }
+
+      const actions = document.createElement("div");
+      actions.className = "script-actions";
+
+      if (!script.active) {
+        const activateBtn = document.createElement("button");
+        activateBtn.className = "btn-activate";
+        activateBtn.title = "Activate";
+        activateBtn.setAttribute("aria-label", `Activate ${script.name}`);
+        activateBtn.innerHTML = "&#9654;";
+        activateBtn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          try {
+            await sendMessage({
+              action: "setActive",
+              account: currentAccount,
+              name: script.name,
+            });
+            await loadScripts();
+          } catch (err) {
+            showStatus(`Error: ${err.message}`, true);
+          }
+        });
+        actions.appendChild(activateBtn);
+      }
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "btn-delete-script";
+      deleteBtn.title = "Delete";
+      deleteBtn.setAttribute("aria-label", `Delete ${script.name}`);
+      deleteBtn.innerHTML = "&#10005;";
+      deleteBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
-        try {
-          await sendMessage({
-            action: "setActive",
-            account: currentAccount,
-            name: btn.dataset.name,
-          });
-          await loadScripts();
-        } catch (err) {
-          showStatus(`Error: ${err.message}`, true);
-        }
-      });
-    });
-
-    // Delete button
-    listEl.querySelectorAll(".btn-delete-script").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        if (!confirm(`Delete script "${btn.dataset.name}"?`)) return;
+        if (!confirm(`Delete script "${script.name}"?`)) return;
         try {
           await sendMessage({
             action: "deleteScript",
             account: currentAccount,
-            name: btn.dataset.name,
+            name: script.name,
           });
           await loadScripts();
         } catch (err) {
           showStatus(`Error: ${err.message}`, true);
         }
       });
-    });
+      actions.appendChild(deleteBtn);
+
+      item.appendChild(actions);
+
+      // Click or keyboard to edit
+      const editHandler = (e) => {
+        if (e.target.closest(".script-actions")) return;
+        openEditor(script.name);
+      };
+      item.addEventListener("click", editHandler);
+      item.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          editHandler(e);
+        }
+      });
+
+      listEl.appendChild(item);
+    }
   } catch (e) {
     showStatus(`Error: ${e.message}`, true);
     $("#actions").classList.remove("hidden");

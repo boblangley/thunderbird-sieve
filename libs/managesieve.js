@@ -132,8 +132,10 @@ class SieveClient {
 
   async _authenticatePlain(username, password) {
     // PLAIN: \0username\0password, base64 encoded
-    const authString = `\x00${username}\x00${password}`;
-    const encoded = btoa(authString);
+    // Use TextEncoder to handle non-Latin1 characters (RFC 4616 uses UTF-8)
+    const encoder = new TextEncoder();
+    const authBytes = encoder.encode(`\x00${username}\x00${password}`);
+    const encoded = btoa(String.fromCharCode(...authBytes));
 
     await this._sendCommand(`AUTHENTICATE "PLAIN" "${encoded}"`);
     const response = await this._readResponse();
@@ -160,14 +162,29 @@ class SieveClient {
     }
 
     const scripts = [];
-    for (const line of response.lines) {
-      // Script lines: "scriptname" [ACTIVE]
-      const match = line.match(/^"((?:[^"\\]|\\.)*)"(\s+ACTIVE)?$/);
-      if (match) {
+    for (let i = 0; i < response.lines.length; i++) {
+      const line = response.lines[i];
+      // Quoted script name: "scriptname" [ACTIVE]
+      const quotedMatch = line.match(/^"((?:[^"\\]|\\.)*)"(\s+ACTIVE)?$/);
+      if (quotedMatch) {
         scripts.push({
-          name: match[1].replace(/\\(.)/g, "$1"),
-          active: !!match[2],
+          name: quotedMatch[1].replace(/\\(.)/g, "$1"),
+          active: !!quotedMatch[2],
         });
+        continue;
+      }
+      // Literal script name: {size+}\r\n<data> [ACTIVE]
+      // The literal data appears as response.data when the line starts with {
+      const literalMatch = line.match(/^\{(\d+)\+?\}$/);
+      if (literalMatch && response.data) {
+        // Check the next line for ACTIVE flag
+        const nextLine = response.lines[i + 1] || "";
+        const isActive = /^\s*ACTIVE\s*$/i.test(nextLine);
+        scripts.push({
+          name: response.data,
+          active: isActive,
+        });
+        if (isActive) i++; // Skip the ACTIVE line
       }
     }
     return scripts;
